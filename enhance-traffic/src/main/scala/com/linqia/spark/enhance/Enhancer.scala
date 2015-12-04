@@ -20,6 +20,23 @@ abstract class Enhancer extends Serializable {
 abstract class BadgeEnhancer(input: String, output: String) extends Enhancer {
   this: Operations =>
 
+  private[this] def selector(traffic: Traffic): TrafficType = traffic.trafficType
+
+  // Some trade offs:
+  // Place all the mapper operations here to be executed by `collect` might have better
+  // performance (?), but will likely increase the failure recovery overhead since doing so will
+  // end up with a coarse grained RDD, and any failure or missing part in the RDD will trigger a
+  // regeneration of the whole RDD.
+  //
+  // Another implementation approach is to chain the operations together, this will generate many
+  // small RDDs, which will likely reduce the re-computation during fault recovery, but might
+  // have some impact on performance.
+  private[this] def action(traffic: Traffic): Traffic = {
+    parseDeviceType(traffic)
+    checkBot(traffic)
+    resolveCampaignCommunityId(traffic)
+  }
+
   override def run(): Unit = {
 
     val traffic = readRaw(input)
@@ -33,23 +50,6 @@ abstract class BadgeEnhancer(input: String, output: String) extends Enhancer {
       TrafficType.CONVERSION,
       TrafficType.CLICK
     )
-
-    def selector(traffic: Traffic): TrafficType = traffic.trafficType
-
-    // Some trade offs:
-    // Place all the mapper operations here to be executed by `collect` might have better
-    // performance (?), but will likely increase the failure recovery overhead since doing so will
-    // end up with a coarse grained RDD, and any failure or missing part in the RDD will trigger a
-    // regeneration of the whole RDD.
-    //
-    // Another implementation approach is to chain the operations together, this will generate many
-    // small RDDs, which will likely reduce the re-computation during fault recovery, but might
-    // have some impact on performance.
-    def action(traffic: Traffic): Traffic = {
-      parseDeviceType(traffic)
-      checkBot(traffic)
-      resolveCampaignCommunityId(traffic)
-    }
 
     val badgeTraffic = traffic.collect(pickup(typesToPickup, selector, action))
 

@@ -1,7 +1,6 @@
 package com.linqia.spark.traffic
 
 import com.linqia.formats._
-import com.linqia.spark.traffic.Util.TabSanitizer
 import org.joda.time.DateTime
 
 import scala.util.Try
@@ -9,6 +8,12 @@ import scala.util.Try
 
 object Traffic {
   type JavaTraffic = com.linqia.formats.Traffic
+
+  private lazy val tabSanitizer = new Sanitizer {
+    override def sanitize(s: String): String = Option(s).map(t => t.replace('\t', '_')).orNull
+  }
+
+  def apply(javaTraffic: JavaTraffic): Traffic = new Traffic(javaTraffic)
 }
 
 /**
@@ -22,7 +27,8 @@ object Traffic {
  */
 sealed class Traffic(
     private[this] val javaTraffic: Traffic.JavaTraffic,
-    private[this] val sanitizer: Sanitizer) extends Serializable with Logger {
+    private[this] val sanitizer: Sanitizer)
+    extends Serializable with Logger {
 
   private[this] var _id, _time: String = _
 
@@ -43,7 +49,7 @@ sealed class Traffic(
   private[this] var _deviceType: Option[DeviceType] = None
 
   def this(javaTraffic: Traffic.JavaTraffic) = {
-    this(javaTraffic, new TabSanitizer)
+    this(javaTraffic, Traffic.tabSanitizer)
   }
 
   def id = _id
@@ -306,39 +312,20 @@ sealed class Traffic(
     }
   }
 
-  private[this] def enhance(): TrafficEnhanced = _trafficType match {
-    case TrafficType.IMPRESSION => {
-      enhanceAdlink(javaTraffic.asInstanceOf[TrafficImpression].enhance())
-    }
-    case TrafficType.CLICK => {
-      enhanceClick(javaTraffic.asInstanceOf[TrafficClick].enhance())
-    }
-    case TrafficType.BADGE => {
-      enhanceCommunity(javaTraffic.asInstanceOf[TrafficBadge].enhance())
-    }
-    case TrafficType.JAVASCRIPT => {
-      enhanceCommunity(javaTraffic.asInstanceOf[TrafficJavascript].enhance())
-    }
-    case TrafficType.CONVERSION => {
-      enhanceConversion(javaTraffic.asInstanceOf[TrafficConversion].enhance())
-    }
-    case TrafficType.CONVERSIONJS => {
-      enhanceConversionJS(javaTraffic.asInstanceOf[TrafficConversionJs].enhance())
-    }
-    case TrafficType.UPDATE => {
-      enhanceCommunity(javaTraffic.asInstanceOf[TrafficUpdate].enhance())
-    }
-    case TrafficType.DISCLOSURE => {
-      enhanceDisclosure(javaTraffic.asInstanceOf[TrafficDisclosure].enhance())
-    }
+  private[this] def enhance(): TrafficEnhanced = javaTraffic match {
+    case t: TrafficImpression => enhanceAdlink(t.enhance())
+    case t: TrafficClick => enhanceClick(t.enhance())
+    case t: TrafficConversion => enhanceConversion(t.enhance())
+    case t: TrafficConversionJs => enhanceConversionJS(t.enhance())
+    case t: TrafficDisclosure => enhanceDisclosure(t.enhance())
+    case t: TrafficJavascript => enhanceCommunity(t.enhance())
+    case t: TrafficBadge => enhanceCommunity(t.enhance())
+    case t: TrafficUpdate => enhanceCommunity(t.enhance())
     case _ => throw new IllegalArgumentException(s"Unsupported type: ${_trafficType}.")
   }
 
   private[this] def enhanceTraffic(traffic: TrafficEnhanced): TrafficEnhanced = {
-    _deviceType match {
-      case Some(deviceType) => Try(traffic.setDeviceType(deviceType))
-      case _ =>
-    }
+    _deviceType.map(dt => Try(traffic.setDeviceType(dt)))
     traffic.setBot(_isBot.getOrElse(false))
     traffic.setCountryCode(_countryCode.orNull)
     traffic.setStateCode(_stateCode.orNull)
@@ -451,26 +438,26 @@ sealed class Traffic(
 
   javaTraffic match {
     case t: TrafficCampaignCommunity => {
-      this._assetId = Option(t.getAssetId())
-      this._responseCode = Option(t.getResponseCode())
+      _assetId = Option(t.getAssetId())
+      _responseCode = Option(t.getResponseCode())
     }
-    case t: TrafficCampaign => this._campaignId = Option(t.getCampaignId())
-    case t: TrafficCommunity => this._communityId = Option(t.getCommunityId())
+    case t: TrafficCampaign => _campaignId = Option(t.getCampaignId())
+    case t: TrafficCommunity => _communityId = Option(t.getCommunityId())
     case t: TrafficConversion => {
-      this._viewId = Option(t.getViewId())
-      this._event = Option(t.getEvent())
+      _viewId = Option(t.getViewId())
+      _event = Option(t.getEvent())
     }
     case _ =>
   }
 
-  this._id = javaTraffic.getId()
-  this._trafficType = javaTraffic.getType()
-  this._dateTime = javaTraffic.getDateTime()
-  this._userAgent = Option(javaTraffic.getUserAgent(sanitizer))
-  this._location = Option(javaTraffic.getLocation())
-  this._url = Option(javaTraffic.getUrl())
-  this._remoteIp = Option(javaTraffic.getRemoteIp())
-  this._permCookie = Option(javaTraffic.getPermanentCookie())
-  this._referer = Option(javaTraffic.getReferer())
+  _id = javaTraffic.getId()
+  _trafficType = javaTraffic.getType()
+  _dateTime = javaTraffic.getDateTime()
+  _userAgent = Option(javaTraffic.getUserAgent(sanitizer))
+  _location = Option(javaTraffic.getLocation())
+  _url = Option(javaTraffic.getUrl())
+  _remoteIp = Option(javaTraffic.getRemoteIp())
+  _permCookie = Option(javaTraffic.getPermanentCookie())
+  _referer = Option(javaTraffic.getReferer())
 }
 

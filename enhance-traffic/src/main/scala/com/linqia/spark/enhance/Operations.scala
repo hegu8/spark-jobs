@@ -61,7 +61,7 @@ trait Operations extends Serializable with Logger {
    *         [[IgnorableFormatException]] is raised
    */
   protected def toTraffic(jsonStr: String): Option[Traffic] = try {
-    Some(new Traffic(Parser.instance().read(jsonStr)))
+    Some(Traffic(Parser.instance().read(jsonStr)))
   } catch {
     case e: IgnorableFormatException => None
     case NonFatal(e) => {

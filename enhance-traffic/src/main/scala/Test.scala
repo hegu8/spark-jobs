@@ -1,30 +1,22 @@
-trait A {
-  def a: String
-}
+class Stack[+A] {
+  def push[B >: A](elem: B): Stack[B] = new Stack[B] {
+    override def top: B = elem
 
-trait AA {
-  def aa: String = "aa"
-}
+    override def pop: Stack[B] = Stack.this
 
-trait B {
-  this: A =>
-  def b: String = "b"
-}
-
-object Test extends App {
-
-  def printa(a: A): Unit = {
-    println(a.a)
+    override def toString() = elem.toString() + " " +
+        Stack.this.toString()
   }
 
-  lazy val a = {
-    println(1)
-  }
+  def top: A = sys.error("no element on stack")
 
-  val some = new B with A {
-    override val a = "a"
-    println(a)
-  }
-  printa(some)
-  //  println(some.a)
+  def pop: Stack[A] = sys.error("no element on stack")
+
+  override def toString() = ""
+}
+
+object VariancesTest extends App {
+  var s: Stack[String] = new Stack().push("hello")
+  var t: Stack[Any] = s.push(3)
+  println(s)
 }
